@@ -1,0 +1,6 @@
+@TopinLite.Biz.PackageSaleHandler_HostAddress = http://localhost:5289
+
+GET {{TopinLite.Biz.PackageSaleHandler_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+	<PropertyGroup>
+		<TargetFramework>net10.0</TargetFramework>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="MediatR" Version="14.1.0" />
+		<PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.6" />
+		<PackageReference Include="NATS.Client" Version="1.1.8" />
+		<PackageReference Include="NATS.Client.Core" Version="2.7.3" />
+		<PackageReference Include="NATS.Net" Version="2.7.3" />
+		<PackageReference Include="Swashbuckle.AspNetCore" Version="10.1.7" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\NatsRpcFoundation\NatsRpcFoundation.csproj" />
+		<ProjectReference Include="..\TopinLite.Domain\TopinLite.Domain.csproj" />
+		<ProjectReference Include="..\TopinLite.Infra.Common\TopinLite.Infra.Common.csproj" />
+		<ProjectReference Include="..\TopinLite.Services\TopinLite.Services.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <Reference Include="BPJ.Common">
+	    <HintPath>..\BPJ.Common.dll</HintPath>
+	  </Reference>
+	</ItemGroup>
+
+</Project>

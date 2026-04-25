@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="StackExchange.Redis" Version="2.12.14" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TopinLite.ApiClient\TopinLite.Infra.ApiClient.csproj" />
+    <ProjectReference Include="..\TopinLite.Infra.Common\TopinLite.Infra.Common.csproj" />
+    <ProjectReference Include="..\TopinLite.Domain\TopinLite.Domain.csproj" />
+  </ItemGroup>
+
+</Project>

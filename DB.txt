@@ -1,0 +1,49 @@
+CREATE OR REPLACE VIEW VW_CACHE_BROKERS AS 
+SELECT *
+  FROM (SELECT FNC_WRAP_DECRYPT(T.PASSWORD, T.FK_SAP_ID) AS STRPASS,
+               T.FK_SAP_ID,
+               T.FK_BROKER_ID,
+               T.PK_BROKERS,
+               T.BROKER_TYPE,
+               T.STATUS,
+               T.SALE_ACCESS
+          FROM TBL_BROKERS T) TBL1
+ WHERE TBL1.STRPASS IS NOT NULL
+
+
+ '''=======================================================================
+ CREATE OR REPLACE FUNCTION FNC_WRAP_DECRYPT(P_M IN VARCHAR2,
+                                            P_K IN VARCHAR2)
+  RETURN VARCHAR2 IS
+  STR VARCHAR2(50);
+BEGIN
+  STR := PKG_ENCRYPTION_AES128.FNC_DECRYPT_AES256(P_INPUT_MESSAGE => P_M,
+                                                  P_KEY           => P_K);
+  RETURN(STR);
+EXCEPTION
+  WHEN OTHERS THEN
+  
+    RETURN('');
+END;
+
+ '''=======================================================================
+CREATE OR REPLACE VIEW VW_CACHE_DYNAMIC_CONDITION AS 
+
+SELECT T.PK_DYNAMIC_CONDITION AS DYNAMICCONDITIONID,
+       T.BIZ_TYPE             AS BIZTYPE,
+       T.KEY_VAL              AS KEYSTR,
+       T.VALUE_VAL            AS VALUESTR,
+       T.RESERVE_1            AS RESERVE1,
+       T.RESERVE_2            AS RESERVE2,
+       T.RESERVE_3            AS RESERVE3
+  FROM TBL_DYNAMIC_CONDITION T
+ WHERE T.PK_DYNAMIC_CONDITION IS NOT NULL
+   AND T.BIZ_TYPE IS NOT NULL
+   AND T.KEY_VAL IS NOT NULL
+
+ '''=======================================================================
+
+ '''=======================================================================
+
+ '''=======================================================================
+ '''=======================================================================

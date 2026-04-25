@@ -1,0 +1,48 @@
+<Solution>
+  <Folder Name="/Application/">
+    <Project Path="TopinLite.Services/TopinLite.Services.csproj" Id="e6567914-6528-4025-84f6-5c05bc3bd240" />
+  </Folder>
+  <Folder Name="/Core/">
+    <Project Path="NatsRpcFoundation/NatsRpcFoundation.csproj" />
+    <Project Path="TopinLite.Domain/TopinLite.Domain.csproj" Id="0c1796cf-75ac-4958-b276-585eb6e9ef0a" />
+  </Folder>
+  <Folder Name="/Infrastructure/">
+    <Project Path="TopinLite.ApiClient/TopinLite.Infra.ApiClient.csproj" Id="2b7ad41d-8058-4900-92f3-2004e9105322" />
+    <Project Path="TopinLite.Infra.Common/TopinLite.Infra.Common.csproj" Id="e73f11cc-67b9-44fc-bea5-4eb6290901ee" />
+    <Project Path="TopinLite.Infra.InMemoryDb/TopinLite.Infra.InMemoryDb.csproj" Id="a1280713-a0d8-4bdb-899a-c2f4a28036f7" />
+    <Project Path="TopinLite.Infra.MsBroker/TopinLite.Infra.MsBroker.csproj" Id="a0708b5e-ee4f-4af6-93e7-1d6ffb25c335" />
+    <Project Path="TopinLite.infra.OracleDataAccess/TopinLite.infra.OracleDataAccess.csproj" Id="f74f51d1-ea4b-4256-ae3a-c12c301af5e0" />
+  </Folder>
+  <Folder Name="/Presentation/">
+    <Project Path="TopinLite.Api.Edge/TopinLite.Api.Edge.csproj" Id="9448eca7-7582-47fd-be22-d4f02dcfae75" />
+  </Folder>
+  <Folder Name="/Presentation/MiniApis/" />
+  <Folder Name="/Presentation/MiniApis/Handlers/">
+    <Project Path="TopinLite.Biz.ChargeHandler.Direct/TopinLite.Biz.ChargeHandler.Direct.csproj" Id="178e62db-65ad-4500-bcd9-aaf13584a945" />
+    <Project Path="TopinLite.Biz.ChargeHandler.Loyalty/TopinLite.Biz.ChargeHandler.Loyalty.csproj" Id="7b6ddff9-0a5b-4f5f-88cd-0f8fb9a79b18" />
+    <Project Path="TopinLite.Biz.ChargeHandler.Women/TopinLite.Biz.ChargeHandler.Women.csproj" Id="9e90ec3b-bd7a-4b68-8ee4-aef33aceebd7" />
+    <Project Path="TopinLite.Biz.ChargeHandler.Youth/TopinLite.Biz.ChargeHandler.Youth.csproj" Id="76b73d8d-f255-413b-9d09-e0bde089db8d" />
+    <Project Path="TopinLite.Biz.ChargeSaleHandler/TopinLite.Biz.ChargeSaleHandler.csproj" Id="98e839ec-f8a3-4c26-b8bd-b7f3e0ba2827" />
+    <Project Path="TopinLite.Biz.PackageSaleHandler/TopinLite.Biz.PackageSaleHandler.csproj" Id="d7a713cb-a8b1-41c6-b8b0-becc53908f4d" />
+  </Folder>
+  <Folder Name="/Presentation/MiniApis/Infrastructure/">
+    <Project Path="TopinLite.Infrastructure.CacheData/TopinLite.Infrastructure.CacheData.csproj" Id="362ca6f0-2428-41dc-a75c-12bae9bd42da" />
+  </Folder>
+  <Folder Name="/Presentation/MiniApis/Wrappers/">
+    <Project Path="TopinLite.CrmTransform.ChangeSubscribersOfferingAdd/TopinLite.CrmTransform.ChangeSubscribersOfferingAdd.csproj" Id="3bef6983-28e0-4ef3-b317-f3187693ff0c" />
+    <Project Path="TopinLite.CrmTransform.CheckOfferEligibility/TopinLite.CrmTransform.CheckOfferEligibility.csproj" Id="686954e3-4015-4745-8da8-768cb6a7335c" />
+    <Project Path="TopinLite.CrmTransform.IntegrationEnquery/TopinLite.CrmTransform.IntegrationEnquery.csproj" Id="b1906a78-74ea-4175-aec1-6852a14bdc2a" />
+    <Project Path="TopinLite.CrmTransform.QueryBalance/TopinLite.CrmTransform.QueryBalance.csproj" Id="1f6a7fd3-0ca6-4050-8d65-3cf2bf6bc7c1" />
+    <Project Path="TopinLite.CrmTransform.QueryCustomerInfoByTel/TopinLite.CrmTransform.QueryCustomerInfoByTel.csproj" Id="261f18c9-5815-4103-8e7c-b5960886e6dd" />
+    <Project Path="TopinLite.CrmTransform.QuerySimType/TopinLite.CrmTransform.QuerySimType.csproj" Id="7f29f9ea-d818-4fbb-88a4-4d87e6625e5d" />
+    <Project Path="TopinLite.CrmTransform.QuerySubscriber/TopinLite.CrmTransform.QuerySubscriber.csproj" Id="2df26788-c17b-4664-bd69-c6e0f7522067" />
+    <Project Path="TopinLite.CrmTransform.RechargeByBroker/TopinLite.CrmTransform.RechargeByBroker.csproj" Id="cb1e1e96-6210-46f1-ba18-e042d6512837" />
+  </Folder>
+  <Folder Name="/Presentation/Workers/">
+    <Project Path="TopinLite.Workers.RedisSyncWorker/TopinLite.Workers.RedisSyncWorker.csproj" Id="9eb099d2-eab7-4c71-8eb1-d9c8d76154ae" />
+  </Folder>
+  <Folder Name="/Solution Items/">
+    <File Path="DB.txt" />
+    <File Path="DockerCommands.txt" />
+  </Folder>
+</Solution>

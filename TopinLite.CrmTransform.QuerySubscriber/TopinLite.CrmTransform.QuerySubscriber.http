@@ -1,0 +1,7 @@
+@TopinLite.CrmTransform.QuerySubscriber_HostAddress = http://localhost:5011
+
+POST {{TopinLite.CrmTransform.QuerySubscriber_HostAddress}}/querySubscriber
+Content-Type: application/json
+Accept: application/json
+
+###

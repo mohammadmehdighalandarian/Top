@@ -1,0 +1,6 @@
+@TopinLite.CrmTransform.ChangeSubscribersOfferingAdd_HostAddress = http://localhost:5254
+
+GET {{TopinLite.CrmTransform.ChangeSubscribersOfferingAdd_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
