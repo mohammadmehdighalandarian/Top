@@ -1,0 +1,6 @@
+@TopinLite.CrmTransform.RechargeByBroker_HostAddress = http://localhost:5233
+
+GET {{TopinLite.CrmTransform.RechargeByBroker_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

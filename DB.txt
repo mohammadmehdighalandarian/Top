@@ -1,0 +1,106 @@
+CREATE OR REPLACE VIEW VW_CACHE_BROKERS AS
+SELECT "STRPASS", "SAPID", "BROKERID", "STATUS"
+  FROM (SELECT FNC_WRAP_DECRYPT(T.PASSWORD, T.FK_SAP_ID) AS STRPASS,
+               T.FK_SAP_ID as SapId,
+               T.PK_BROKERS as BrokerId,
+               T.STATUS as Status
+          FROM TBL_BROKERS T) TBL1
+ WHERE TBL1.STRPASS IS NOT NULL;
+
+ '''=======================================================================
+ CREATE OR REPLACE FUNCTION FNC_WRAP_DECRYPT(P_M IN VARCHAR2,
+                                            P_K IN VARCHAR2)
+  RETURN VARCHAR2 IS
+  STR VARCHAR2(50);
+BEGIN
+  STR := PKG_ENCRYPTION_AES128.FNC_DECRYPT_AES256(P_INPUT_MESSAGE => P_M,
+                                                  P_KEY           => P_K);
+  RETURN(STR);
+EXCEPTION
+  WHEN OTHERS THEN
+  
+    RETURN('');
+END;
+
+ '''=======================================================================
+CREATE OR REPLACE VIEW VW_CACHE_DYNAMIC_CONDITION AS 
+
+SELECT T.PK_DYNAMIC_CONDITION AS DYNAMICCONDITIONID,
+       T.BIZ_TYPE             AS BIZTYPE,
+       T.KEY_VAL              AS KEYSTR,
+       T.VALUE_VAL            AS VALUESTR,
+       T.RESERVE_1            AS RESERVE1,
+       T.RESERVE_2            AS RESERVE2,
+       T.RESERVE_3            AS RESERVE3
+  FROM TBL_DYNAMIC_CONDITION T
+ WHERE T.PK_DYNAMIC_CONDITION IS NOT NULL
+   AND T.BIZ_TYPE IS NOT NULL
+   AND T.KEY_VAL IS NOT NULL
+
+ '''=======================================================================
+ CREATE OR REPLACE VIEW VW_DIY_ACCESS AS
+SELECT
+    FK_BROKER_ID   AS BrokerId,
+    FK_OFFER_ID    AS OfferId,
+    ATTRIBUTE_TYPE AS AttributeType,
+    ATTRIBUTE_MIN  AS AttributeMin,
+    ATTRIBUTE_MAX  AS AttributeMax
+FROM TBL_DIY_ACCESS;
+ '''=======================================================================
+ CREATE OR REPLACE VIEW VW_BROKER_ACCESS AS
+SELECT
+    FK_BROKER_ID AS BrokerId,
+    FK_OFFER_ID  AS OfferId,
+    STATUS       AS Status
+FROM TBL_BROKER_ACCESS
+WHERE STATUS = 1;
+
+ '''=======================================================================
+ CREATE OR REPLACE VIEW VW_DIY_PRICE AS
+SELECT
+    TYPE   AS Type,
+    UNIT   AS Unit,
+    PRICE  AS Price,
+    STATUS AS Status
+FROM TBS_DIY_PRICE
+WHERE STATUS = 1;
+ '''=======================================================================
+ create or replace view VW_PRIMARY_WHITE_LIST as
+   select T.OFFER_ID AS OFFERID, T.STATUS, T.TYPE
+     from TBS_PRIMARY_WHITE_LIST T
+     where T.Status = 1
+ '''=======================================================================
+ create or replace view VW_BROKER_SALE_LIMIT as
+   SELECT T.RETRY_LIMIT AS RetryLimit, T.TIME_LIMIT AS TimeLimit, A.PK_BROKERS AS BrokerId
+     FROM TBS_BROKER_SALE_LIMIT T
+     JOIN TBL_BROKERS A
+       ON T.PK_BROKER_SALE_LIMIT = NVL(A.FK_SALE_LIMIT, 0);
+ '''=======================================================================
+ create or replace view VW_TRADE_TYPES as
+  select t.Recharge_Type RechargeType,
+         t.Recharge_Desc RechargeDesc,
+         t.Operator_Id   OperatorId,
+         t.Operator_Name OperatorName
+    from TBS_TRADE_TYPE t
+ '''=======================================================================
+ create or replace view VW_SELECTED_BROKERS as
+  select t.pk_selected_brokers SelectedBrokerId,
+         t.fk_broker_id BrokerId,
+         t.fk_offer_id OfferId,
+         t.gift_percent GiftPercent,
+         t.status Status
+    from Tbl_Selected_Brokers t
+ '''=======================================================================
+ create or replace view VW_SMS_TEXT as
+  select t.Pk_Sms_Text SmsId,
+         t.broker_id BrokerId,
+         t.Request_Type RequestType,
+         t.sms_text SmsText
+  from TBL_SMS_TEXT t
+ '''=======================================================================
+ create or replace view VW_MESSAGES as
+  select t.message_id MessageId,
+         t.method_name MethodName,
+         t.message_text MessageText
+    from tbl_messages t
+ '''=======================================================================

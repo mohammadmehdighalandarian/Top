@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+	<PropertyGroup>
+		<TargetFramework>net10.0</TargetFramework>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<UserSecretsId>dotnet-TopinLite.Workers.RedisSyncWorker-f5e432ed-916d-481f-9ee7-42851aec7baa</UserSecretsId>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.6" />
+		<PackageReference Include="StackExchange.Redis.Extensions.Core" Version="12.1.0" />
+		<PackageReference Include="StackExchange.Redis.Extensions.System.Text.Json" Version="12.1.0" />
+		<PackageReference Include="StackExchange.Redis" Version="2.12.14" />
+		<PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks" Version="10.0.6" />
+		<PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="*" />
+		<PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="*" />
+		<PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="*" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <ProjectReference Include="..\TopinLite.Domain\TopinLite.Domain.csproj" />
+	  <ProjectReference Include="..\TopinLite.Infra.InMemoryDb\TopinLite.Infra.InMemoryDb.csproj" />
+	  <ProjectReference Include="..\TopinLite.infra.OracleDataAccess\TopinLite.infra.OracleDataAccess.csproj" />
+	</ItemGroup>
+</Project>

@@ -1,0 +1,28 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.6" />
+		<PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.23.0" />
+		<PackageReference Include="prometheus-net" Version="8.2.1" />
+		<PackageReference Include="prometheus-net.AspNetCore" Version="8.2.1" />
+		<PackageReference Include="StackExchange.Redis.Extensions.Core" Version="12.1.0" />
+		<PackageReference Include="StackExchange.Redis.Extensions.System.Text.Json" Version="12.1.0" />
+		<PackageReference Include="Swashbuckle.AspNetCore" Version="10.1.7" />
+		<PackageReference Include="Swashbuckle.AspNetCore.Newtonsoft" Version="10.1.7" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\NatsRpcFoundation\NatsRpcFoundation.csproj" />
+		<ProjectReference Include="..\TopinLite.ApiClient\TopinLite.Infra.ApiClient.csproj" />
+		<ProjectReference Include="..\TopinLite.Domain\TopinLite.Domain.csproj" />
+		<ProjectReference Include="..\TopinLite.Infra.MsBroker\TopinLite.Infra.MsBroker.csproj" />
+		<ProjectReference Include="..\TopinLite.Services\TopinLite.Services.csproj" />
+	</ItemGroup>
+
+</Project>

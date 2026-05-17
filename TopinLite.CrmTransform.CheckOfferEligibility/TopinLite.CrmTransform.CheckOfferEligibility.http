@@ -1,0 +1,11 @@
+@TopinLite.CrmTransform.CheckOfferEligibility_HostAddress = http://localhost:5301
+
+POST {{TopinLite.CrmTransform.CheckOfferEligibility_HostAddress}}/checkOfferEligibility
+Content-Type: application/json
+
+{
+  "PrimaryIdentity": "989121234567",
+  "Mss": "Topup/Topin-1",
+  "OfferId": "1001"
+}
+

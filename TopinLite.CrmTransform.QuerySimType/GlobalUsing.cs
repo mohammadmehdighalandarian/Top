@@ -1,0 +1,17 @@
+﻿global using Microsoft.Extensions.Http;
+global using System.Net;
+global using TopinLite.Domain;
+global using TopinLite.Domain.Commons;
+global using StackExchange.Redis.Extensions.Core;
+global using StackExchange.Redis.Extensions.Core.Abstractions;
+global using StackExchange.Redis.Extensions.Core.Configuration;
+global using StackExchange.Redis.Extensions.Core.Implementations;
+global using MediatR;
+global using Microsoft.Extensions.DependencyInjection.Extensions;
+global using Microsoft.OpenApi;
+global using Prometheus;
+global using StackExchange.Redis.Extensions.System.Text.Json;
+global using TopinLite.Domain.Configuration;
+global using TopinLite.Domain.HuawiMicroGateway;
+global using TopinLite.Domain.TopinApi;
+global using TopinLite.Services.MiniApiCommands;

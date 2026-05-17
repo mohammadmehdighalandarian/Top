@@ -1,0 +1,52 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: pg-http-traffic
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: httptraffic
+      POSTGRES_USER: httpuser
+      POSTGRES_PASSWORD: StrongPasswordHere
+      TZ: UTC
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_http_traffic_data:/var/lib/postgresql/data
+    shm_size: 1gb
+    command:
+      - "postgres"
+      - "-c"
+      - "shared_buffers=2GB"
+      - "-c"
+      - "effective_cache_size=6GB"
+      - "-c"
+      - "maintenance_work_mem=512MB"
+      - "-c"
+      - "wal_buffers=16MB"
+      - "-c"
+      - "checkpoint_completion_target=0.9"
+      - "-c"
+      - "max_wal_size=8GB"
+      - "-c"
+      - "min_wal_size=2GB"
+      - "-c"
+      - "random_page_cost=1.1"
+      - "-c"
+      - "effective_io_concurrency=200"
+      - "-c"
+      - "work_mem=16MB"
+      - "-c"
+      - "max_connections=200"
+      - "-c"
+      - "wal_compression=on"
+      - "-c"
+      - "logging_collector=on"
+      - "-c"
+      - "log_min_duration_statement=1000"
+      - "-c"
+      - "idle_in_transaction_session_timeout=60000"
+
+volumes:
+  pg_http_traffic_data:
