@@ -26,7 +26,7 @@ internal sealed class ErrorLogConsumer : RabbitConsumerBase<ErrorLogModel, Error
         _options = consumerOptions.Value;
     }
 
-    protected override string QueueName => _queueConfig.QueueName;
+    protected override RabbitMqQueueConfigModel QueueConfig => _queueConfig;
     protected override string ConsumerName => "ErrorLog";
 
     protected override ErrorLogRow Map(ErrorLogModel message)

@@ -62,12 +62,19 @@ namespace TopinLite.Infra.MsBroker.RabbitMQ
         {
             try
             {
+                Dictionary<string, object?> queueArguments = [];
+                if (queueConfig.IsRetryEnabled)
+                {
+                    queueArguments["x-dead-letter-exchange"] = queueConfig.EffectiveRetryExchangeName;
+                    queueArguments["x-dead-letter-routing-key"] = queueConfig.EffectiveRetryRoutingKey;
+                }
+
                 await _model.QueueDeclareAsync(
                     queue: queueConfig.QueueName,
                     durable: queueConfig.QueueDurable,
                     exclusive: false,
                     autoDelete: queueConfig.QueueAutoDelete,
-                    arguments: null);
+                    arguments: queueArguments.Count == 0 ? null : queueArguments);
                 await _model.ExchangeDeclareAsync(
                     exchange: queueConfig.ExchangeName,
                     type: ExchangeType.Direct,
@@ -78,6 +85,56 @@ namespace TopinLite.Infra.MsBroker.RabbitMQ
                     queue: queueConfig.QueueName,
                     exchange: queueConfig.ExchangeName,
                     routingKey: queueConfig.RoutingKey);
+
+                if (!queueConfig.IsRetryEnabled)
+                {
+                    return;
+                }
+
+                await _model.ExchangeDeclareAsync(
+                    exchange: queueConfig.EffectiveRetryExchangeName,
+                    type: ExchangeType.Direct,
+                    durable: queueConfig.ExchangeDurable,
+                    autoDelete: queueConfig.ExchangeAutoDelete,
+                    arguments: null);
+
+                Dictionary<string, object?> retryQueueArguments = new()
+                {
+                    ["x-message-ttl"] = queueConfig.RetryDelayMilliseconds > 0 ? queueConfig.RetryDelayMilliseconds : 30000,
+                    ["x-dead-letter-exchange"] = queueConfig.ExchangeName,
+                    ["x-dead-letter-routing-key"] = queueConfig.RoutingKey
+                };
+
+                await _model.QueueDeclareAsync(
+                    queue: queueConfig.EffectiveRetryQueueName,
+                    durable: queueConfig.QueueDurable,
+                    exclusive: false,
+                    autoDelete: queueConfig.QueueAutoDelete,
+                    arguments: retryQueueArguments);
+
+                await _model.QueueBindAsync(
+                    queue: queueConfig.EffectiveRetryQueueName,
+                    exchange: queueConfig.EffectiveRetryExchangeName,
+                    routingKey: queueConfig.EffectiveRetryRoutingKey);
+
+                await _model.ExchangeDeclareAsync(
+                    exchange: queueConfig.EffectiveDeadLetterExchangeName,
+                    type: ExchangeType.Direct,
+                    durable: queueConfig.ExchangeDurable,
+                    autoDelete: queueConfig.ExchangeAutoDelete,
+                    arguments: null);
+
+                await _model.QueueDeclareAsync(
+                    queue: queueConfig.EffectiveDeadLetterQueueName,
+                    durable: queueConfig.QueueDurable,
+                    exclusive: false,
+                    autoDelete: queueConfig.QueueAutoDelete,
+                    arguments: null);
+
+                await _model.QueueBindAsync(
+                    queue: queueConfig.EffectiveDeadLetterQueueName,
+                    exchange: queueConfig.EffectiveDeadLetterExchangeName,
+                    routingKey: queueConfig.EffectiveDeadLetterRoutingKey);
             }
             catch (Exception ex)
             {
@@ -95,15 +152,25 @@ namespace TopinLite.Infra.MsBroker.RabbitMQ
                 {
                     await CreateRabbitConnection();
                 }
-    
 
-                await Task.Run(async () =>
+                await CreateExchangeAndQueue(queueConfig);
+
+                BasicProperties properties = new()
                 {
-                    await _model.BasicPublishAsync(
-                        exchange: queueConfig.ExchangeName,
-                        routingKey: queueConfig.RoutingKey,
-                        body: message);
-                });
+                    ContentType = "application/json",
+                    DeliveryMode = DeliveryModes.Persistent,
+                    Headers = new Dictionary<string, object?>
+                    {
+                        ["x-retry-count"] = 0
+                    }
+                };
+
+                await _model.BasicPublishAsync(
+                    exchange: queueConfig.ExchangeName,
+                    routingKey: queueConfig.RoutingKey,
+                    mandatory: false,
+                    basicProperties: properties,
+                    body: message);
 
                 return true;
             }

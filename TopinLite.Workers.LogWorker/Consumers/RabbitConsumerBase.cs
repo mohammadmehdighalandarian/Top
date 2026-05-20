@@ -30,8 +30,10 @@ internal abstract class RabbitConsumerBase<TMessage, TRow> : BackgroundService
         _logger = logger;
     }
 
+    protected abstract RabbitMqQueueConfigModel QueueConfig { get; }
+
     /// <summary>The RabbitMQ queue this consumer reads from.</summary>
-    protected abstract string QueueName { get; }
+    protected string QueueName => QueueConfig.QueueName;
  
     /// <summary>Friendly name used in logs.</summary>
     protected abstract string ConsumerName { get; }
@@ -67,6 +69,7 @@ internal abstract class RabbitConsumerBase<TMessage, TRow> : BackgroundService
  
     private async Task RunOneSessionAsync(CancellationToken stoppingToken)
     {
+        RabbitMqQueueConfigModel queueConfig = QueueConfig;
         ConnectionFactory factory = new()
         {
             HostName = _connectionConfig.HostAddress,
@@ -83,13 +86,88 @@ internal abstract class RabbitConsumerBase<TMessage, TRow> : BackgroundService
         await using IChannel channel = await connection.CreateChannelAsync(cancellationToken: stoppingToken).ConfigureAwait(false);
  
         // Declare queue defensively — same flags the producer uses. Idempotent.
-        await channel.QueueDeclareAsync(
-            queue: QueueName,
-            durable: true,
-            exclusive: false,
-            autoDelete: false,
+        Dictionary<string, object?> queueArguments = [];
+        if (queueConfig.IsRetryEnabled)
+        {
+            queueArguments["x-dead-letter-exchange"] = queueConfig.EffectiveRetryExchangeName;
+            queueArguments["x-dead-letter-routing-key"] = queueConfig.EffectiveRetryRoutingKey;
+        }
+
+        await channel.ExchangeDeclareAsync(
+            exchange: queueConfig.ExchangeName,
+            type: ExchangeType.Direct,
+            durable: queueConfig.ExchangeDurable,
+            autoDelete: queueConfig.ExchangeAutoDelete,
             arguments: null,
             cancellationToken: stoppingToken).ConfigureAwait(false);
+
+        await channel.QueueDeclareAsync(
+            queue: QueueName,
+            durable: queueConfig.QueueDurable,
+            exclusive: false,
+            autoDelete: queueConfig.QueueAutoDelete,
+            arguments: queueArguments.Count == 0 ? null : queueArguments,
+            cancellationToken: stoppingToken).ConfigureAwait(false);
+
+        await channel.QueueBindAsync(
+            queue: QueueName,
+            exchange: queueConfig.ExchangeName,
+            routingKey: queueConfig.RoutingKey,
+            cancellationToken: stoppingToken).ConfigureAwait(false);
+
+        if (queueConfig.IsRetryEnabled)
+        {
+            await channel.ExchangeDeclareAsync(
+                exchange: queueConfig.EffectiveRetryExchangeName,
+                type: ExchangeType.Direct,
+                durable: queueConfig.ExchangeDurable,
+                autoDelete: queueConfig.ExchangeAutoDelete,
+                arguments: null,
+                cancellationToken: stoppingToken).ConfigureAwait(false);
+
+            Dictionary<string, object?> retryQueueArguments = new()
+            {
+                ["x-message-ttl"] = queueConfig.RetryDelayMilliseconds > 0 ? queueConfig.RetryDelayMilliseconds : 30000,
+                ["x-dead-letter-exchange"] = queueConfig.ExchangeName,
+                ["x-dead-letter-routing-key"] = queueConfig.RoutingKey
+            };
+
+            await channel.QueueDeclareAsync(
+                queue: queueConfig.EffectiveRetryQueueName,
+                durable: queueConfig.QueueDurable,
+                exclusive: false,
+                autoDelete: queueConfig.QueueAutoDelete,
+                arguments: retryQueueArguments,
+                cancellationToken: stoppingToken).ConfigureAwait(false);
+
+            await channel.QueueBindAsync(
+                queue: queueConfig.EffectiveRetryQueueName,
+                exchange: queueConfig.EffectiveRetryExchangeName,
+                routingKey: queueConfig.EffectiveRetryRoutingKey,
+                cancellationToken: stoppingToken).ConfigureAwait(false);
+
+            await channel.ExchangeDeclareAsync(
+                exchange: queueConfig.EffectiveDeadLetterExchangeName,
+                type: ExchangeType.Direct,
+                durable: queueConfig.ExchangeDurable,
+                autoDelete: queueConfig.ExchangeAutoDelete,
+                arguments: null,
+                cancellationToken: stoppingToken).ConfigureAwait(false);
+
+            await channel.QueueDeclareAsync(
+                queue: queueConfig.EffectiveDeadLetterQueueName,
+                durable: queueConfig.QueueDurable,
+                exclusive: false,
+                autoDelete: queueConfig.QueueAutoDelete,
+                arguments: null,
+                cancellationToken: stoppingToken).ConfigureAwait(false);
+
+            await channel.QueueBindAsync(
+                queue: queueConfig.EffectiveDeadLetterQueueName,
+                exchange: queueConfig.EffectiveDeadLetterExchangeName,
+                routingKey: queueConfig.EffectiveDeadLetterRoutingKey,
+                cancellationToken: stoppingToken).ConfigureAwait(false);
+        }
  
         // PrefetchCount bounds in-flight unacked messages.
         await channel.BasicQosAsync(
@@ -119,25 +197,22 @@ internal abstract class RabbitConsumerBase<TMessage, TRow> : BackgroundService
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex,
-                    "{Consumer}: dropping unparseable message (deliveryTag={Tag})",
+                _logger.LogError(ex, "{Consumer}: failed to deserialize/map message (deliveryTag={Tag})",
                     ConsumerName, ea.DeliveryTag);
-                try
-                {
-                    await channel.BasicAckAsync(ea.DeliveryTag, multiple: false, cancellationToken: stoppingToken)
-                        .ConfigureAwait(false);
-                }
-                catch
-                {
-                    // channel may be gone — next session will reconnect
-                }
+                await RouteToDeadLetterOrAckAsync(
+                        channel,
+                        ea,
+                        queueConfig,
+                        stoppingToken,
+                        "deserialization_failed")
+                    .ConfigureAwait(false);
                 return;
             }
  
             await pendingLock.WaitAsync(stoppingToken).ConfigureAwait(false);
             try
             {
-                pending.Add(new PendingDelivery<TRow>(ea.DeliveryTag, row));
+                pending.Add(new PendingDelivery<TRow>(ea, row));
             }
             finally
             {
@@ -183,16 +258,28 @@ internal abstract class RabbitConsumerBase<TMessage, TRow> : BackgroundService
                 List<TRow> rows = snapshot.ConvertAll(p => p.Row);
                 await FlushAsync(rows, stoppingToken).ConfigureAwait(false);
  
-                // Ack with multiple=true on the highest delivery tag of the batch.
-                ulong lastTag = snapshot[^1].DeliveryTag;
-                await channel.BasicAckAsync(lastTag, multiple: true, cancellationToken: stoppingToken)
-                    .ConfigureAwait(false);
+                foreach (PendingDelivery<TRow> item in snapshot)
+                {
+                    await channel.BasicAckAsync(item.Delivery.DeliveryTag, multiple: false, cancellationToken: stoppingToken)
+                        .ConfigureAwait(false);
+                }
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex,
                     "{Consumer}: Postgres flush failed for {Count} messages, pausing consumer",
                     ConsumerName, snapshot.Count);
+
+                if (queueConfig.IsRetryEnabled)
+                {
+                    await HandleBatchFailureWithRetryAsync(
+                            channel,
+                            queueConfig,
+                            snapshot,
+                            stoppingToken)
+                        .ConfigureAwait(false);
+                    continue;
+                }
  
                 // Put the snapshot back at the FRONT of pending so order is
                 // preserved when we resume. We must hold them in memory because
@@ -254,6 +341,175 @@ internal abstract class RabbitConsumerBase<TMessage, TRow> : BackgroundService
         }
     }
  
-    private readonly record struct PendingDelivery<T>(ulong DeliveryTag, T Row);
+    private async Task HandleBatchFailureWithRetryAsync(
+        IChannel channel,
+        RabbitMqQueueConfigModel queueConfig,
+        IReadOnlyList<PendingDelivery<TRow>> snapshot,
+        CancellationToken cancellationToken)
+    {
+        int maxRetries = queueConfig.MaxRetries > 0 ? queueConfig.MaxRetries : 5;
+        foreach (PendingDelivery<TRow> pendingDelivery in snapshot)
+        {
+            int retryCount = GetRetryCount(pendingDelivery.Delivery, QueueName);
+            if (retryCount >= maxRetries)
+            {
+                await PublishToDeadLetterAndAckAsync(
+                        channel,
+                        pendingDelivery.Delivery,
+                        queueConfig,
+                        cancellationToken,
+                        "max_retry_reached")
+                    .ConfigureAwait(false);
+                continue;
+            }
+
+            await channel.BasicNackAsync(
+                    pendingDelivery.Delivery.DeliveryTag,
+                    multiple: false,
+                    requeue: false,
+                    cancellationToken: cancellationToken)
+                .ConfigureAwait(false);
+        }
+    }
+
+    private async Task RouteToDeadLetterOrAckAsync(
+        IChannel channel,
+        BasicDeliverEventArgs delivery,
+        RabbitMqQueueConfigModel queueConfig,
+        CancellationToken cancellationToken,
+        string reason)
+    {
+        try
+        {
+            if (queueConfig.IsRetryEnabled)
+            {
+                await PublishToDeadLetterAndAckAsync(channel, delivery, queueConfig, cancellationToken, reason)
+                    .ConfigureAwait(false);
+            }
+            else
+            {
+                await channel.BasicAckAsync(delivery.DeliveryTag, multiple: false, cancellationToken: cancellationToken)
+                    .ConfigureAwait(false);
+            }
+        }
+        catch
+        {
+            // channel may be gone — next session will reconnect
+        }
+    }
+
+    private async Task PublishToDeadLetterAndAckAsync(
+        IChannel channel,
+        BasicDeliverEventArgs delivery,
+        RabbitMqQueueConfigModel queueConfig,
+        CancellationToken cancellationToken,
+        string reason)
+    {
+        BasicProperties deadLetterProperties = new()
+        {
+            ContentType = "application/json",
+            DeliveryMode = DeliveryModes.Persistent,
+            Headers = CloneHeaders(delivery.BasicProperties.Headers)
+        };
+
+        int retryCount = GetRetryCount(delivery, QueueName);
+        deadLetterProperties.Headers["x-retry-count"] = retryCount;
+        deadLetterProperties.Headers["x-failure-reason"] = reason;
+
+        await channel.BasicPublishAsync(
+                exchange: queueConfig.EffectiveDeadLetterExchangeName,
+                routingKey: queueConfig.EffectiveDeadLetterRoutingKey,
+                mandatory: false,
+                basicProperties: deadLetterProperties,
+                body: delivery.Body,
+                cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
+        await channel.BasicAckAsync(delivery.DeliveryTag, multiple: false, cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    private static int GetRetryCount(BasicDeliverEventArgs delivery, string queueName)
+    {
+        int headerCount = TryGetIntValue(delivery.BasicProperties.Headers, "x-retry-count");
+        int deadLetterCount = GetDeadLetterCount(delivery.BasicProperties.Headers, queueName);
+        return Math.Max(headerCount, deadLetterCount);
+    }
+
+    private static int TryGetIntValue(IDictionary<string, object?>? headers, string key)
+    {
+        if (headers is null || !headers.TryGetValue(key, out object? value) || value is null)
+        {
+            return 0;
+        }
+
+        if (value is byte[] bytes && int.TryParse(System.Text.Encoding.UTF8.GetString(bytes), out int byteValue))
+        {
+            return byteValue;
+        }
+
+        if (value is ReadOnlyMemory<byte> memory &&
+            int.TryParse(System.Text.Encoding.UTF8.GetString(memory.Span), out int memoryValue))
+        {
+            return memoryValue;
+        }
+
+        return value switch
+        {
+            int intValue => intValue,
+            long longValue => (int)longValue,
+            short shortValue => shortValue,
+            byte byteValue2 => byteValue2,
+            _ => int.TryParse(value.ToString(), out int parsedValue) ? parsedValue : 0
+        };
+    }
+
+    private static int GetDeadLetterCount(IDictionary<string, object?>? headers, string queueName)
+    {
+        if (headers is null || !headers.TryGetValue("x-death", out object? value) || value is null)
+        {
+            return 0;
+        }
+
+        if (value is not System.Collections.IList deathEntries)
+        {
+            return 0;
+        }
+
+        int retries = 0;
+        foreach (object? entry in deathEntries)
+        {
+            if (entry is not IDictionary<string, object?> deathDictionary)
+            {
+                continue;
+            }
+
+            object? queue = deathDictionary.TryGetValue("queue", out object? queueObj) ? queueObj : null;
+            string? queueValue = queue as string ?? (queue is ReadOnlyMemory<byte> queueMem
+                ? System.Text.Encoding.UTF8.GetString(queueMem.Span)
+                : queue is byte[] queueBytes ? System.Text.Encoding.UTF8.GetString(queueBytes) : null);
+
+            if (!string.Equals(queueValue, queueName, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            retries = Math.Max(retries, TryGetIntValue(deathDictionary, "count"));
+        }
+
+        return retries;
+    }
+
+    private static Dictionary<string, object?> CloneHeaders(IDictionary<string, object?>? headers)
+    {
+        if (headers is null)
+        {
+            return [];
+        }
+
+        return headers.ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+    }
+
+    private readonly record struct PendingDelivery<T>(BasicDeliverEventArgs Delivery, T Row);
 
 }
