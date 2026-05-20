@@ -26,7 +26,7 @@ internal sealed class UserActivityLogConsumer : RabbitConsumerBase<UserActivityC
         _options = consumerOptions.Value;
     }
 
-    protected override string QueueName => _queueConfig.QueueName;
+    protected override RabbitMqQueueConfigModel QueueConfig => _queueConfig;
     protected override string ConsumerName => "UserActivityLog";
 
     protected override UserActivityLogRow Map(UserActivityCallLogModel message)
