@@ -14,6 +14,7 @@ namespace TopinLite.Infra.MsBroker.RabbitMQ
 
     public class Producer : IProducer, IDisposable
     {
+        private const string RetryCountHeader = "x-retry-count";
         private readonly RabbitMqConfigModel _envConfig;
         private readonly ILogger<Producer> _logger;
         private IConnection _connection;
@@ -62,18 +63,62 @@ namespace TopinLite.Infra.MsBroker.RabbitMQ
         {
             try
             {
-                await _model.QueueDeclareAsync(
-                    queue: queueConfig.QueueName,
-                    durable: queueConfig.QueueDurable,
-                    exclusive: false,
-                    autoDelete: queueConfig.QueueAutoDelete,
-                    arguments: null);
                 await _model.ExchangeDeclareAsync(
                     exchange: queueConfig.ExchangeName,
                     type: ExchangeType.Direct,
                     durable: queueConfig.ExchangeDurable,
                     autoDelete: queueConfig.ExchangeAutoDelete,
                     arguments: null);
+
+                if (HasRetryTopology(queueConfig))
+                {
+                    await _model.ExchangeDeclareAsync(
+                        exchange: queueConfig.RetryExchangeName,
+                        type: ExchangeType.Direct,
+                        durable: queueConfig.ExchangeDurable,
+                        autoDelete: queueConfig.ExchangeAutoDelete,
+                        arguments: null);
+                    await _model.ExchangeDeclareAsync(
+                        exchange: queueConfig.DeadLetterExchangeName,
+                        type: ExchangeType.Direct,
+                        durable: queueConfig.ExchangeDurable,
+                        autoDelete: queueConfig.ExchangeAutoDelete,
+                        arguments: null);
+
+                    await _model.QueueDeclareAsync(
+                        queue: queueConfig.RetryQueueName,
+                        durable: queueConfig.QueueDurable,
+                        exclusive: false,
+                        autoDelete: queueConfig.QueueAutoDelete,
+                        arguments: new Dictionary<string, object>
+                        {
+                            ["x-message-ttl"] = ResolveRetryDelayMilliseconds(queueConfig),
+                            ["x-dead-letter-exchange"] = queueConfig.ExchangeName,
+                            ["x-dead-letter-routing-key"] = queueConfig.RoutingKey
+                        });
+                    await _model.QueueBindAsync(
+                        queue: queueConfig.RetryQueueName,
+                        exchange: queueConfig.RetryExchangeName,
+                        routingKey: queueConfig.RetryRoutingKey);
+
+                    await _model.QueueDeclareAsync(
+                        queue: queueConfig.DeadLetterQueueName,
+                        durable: queueConfig.QueueDurable,
+                        exclusive: false,
+                        autoDelete: queueConfig.QueueAutoDelete,
+                        arguments: null);
+                    await _model.QueueBindAsync(
+                        queue: queueConfig.DeadLetterQueueName,
+                        exchange: queueConfig.DeadLetterExchangeName,
+                        routingKey: queueConfig.DeadLetterRoutingKey);
+                }
+
+                await _model.QueueDeclareAsync(
+                    queue: queueConfig.QueueName,
+                    durable: queueConfig.QueueDurable,
+                    exclusive: false,
+                    autoDelete: queueConfig.QueueAutoDelete,
+                    arguments: CreateMainQueueArguments(queueConfig));
                 await _model.QueueBindAsync(
                     queue: queueConfig.QueueName,
                     exchange: queueConfig.ExchangeName,
@@ -95,15 +140,25 @@ namespace TopinLite.Infra.MsBroker.RabbitMQ
                 {
                     await CreateRabbitConnection();
                 }
-    
 
-                await Task.Run(async () =>
+                await CreateExchangeAndQueue(queueConfig);
+
+                BasicProperties properties = new()
                 {
-                    await _model.BasicPublishAsync(
-                        exchange: queueConfig.ExchangeName,
-                        routingKey: queueConfig.RoutingKey,
-                        body: message);
-                });
+                    Persistent = true,
+                    ContentType = "application/json",
+                    Headers = new Dictionary<string, object>
+                    {
+                        [RetryCountHeader] = 0
+                    }
+                };
+
+                await _model.BasicPublishAsync(
+                    exchange: queueConfig.ExchangeName,
+                    routingKey: queueConfig.RoutingKey,
+                    mandatory: false,
+                    basicProperties: properties,
+                    body: message);
 
                 return true;
             }
@@ -124,6 +179,37 @@ namespace TopinLite.Infra.MsBroker.RabbitMQ
             _connection?.CloseAsync();
             _connection?.Dispose();
             _disposed = true;
+        }
+
+        private Dictionary<string, object>? CreateMainQueueArguments(RabbitMqQueueConfigModel queueConfig)
+        {
+            if (!HasRetryTopology(queueConfig))
+            {
+                return null;
+            }
+
+            return new Dictionary<string, object>
+            {
+                ["x-dead-letter-exchange"] = queueConfig.DeadLetterExchangeName,
+                ["x-dead-letter-routing-key"] = queueConfig.DeadLetterRoutingKey
+            };
+        }
+
+        private int ResolveRetryDelayMilliseconds(RabbitMqQueueConfigModel queueConfig)
+        {
+            int defaultDelay = _envConfig.RetryDelayMilliseconds > 0 ? _envConfig.RetryDelayMilliseconds : 30000;
+            int delay = queueConfig.RetryDelayMilliseconds ?? defaultDelay;
+            return delay > 0 ? delay : defaultDelay;
+        }
+
+        private static bool HasRetryTopology(RabbitMqQueueConfigModel queueConfig)
+        {
+            return !string.IsNullOrWhiteSpace(queueConfig.RetryExchangeName) &&
+                   !string.IsNullOrWhiteSpace(queueConfig.RetryQueueName) &&
+                   !string.IsNullOrWhiteSpace(queueConfig.RetryRoutingKey) &&
+                   !string.IsNullOrWhiteSpace(queueConfig.DeadLetterExchangeName) &&
+                   !string.IsNullOrWhiteSpace(queueConfig.DeadLetterQueueName) &&
+                   !string.IsNullOrWhiteSpace(queueConfig.DeadLetterRoutingKey);
         }
     }
 }
