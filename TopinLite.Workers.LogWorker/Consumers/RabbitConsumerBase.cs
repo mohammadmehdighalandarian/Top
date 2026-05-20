@@ -93,13 +93,81 @@ internal abstract class RabbitConsumerBase<TMessage, TRow> : BackgroundService
             queueArguments["x-dead-letter-routing-key"] = queueConfig.EffectiveRetryRoutingKey;
         }
 
+        await channel.ExchangeDeclareAsync(
+            exchange: queueConfig.ExchangeName,
+            type: ExchangeType.Direct,
+            durable: queueConfig.ExchangeDurable,
+            autoDelete: queueConfig.ExchangeAutoDelete,
+            arguments: null,
+            cancellationToken: stoppingToken).ConfigureAwait(false);
+
         await channel.QueueDeclareAsync(
             queue: QueueName,
-            durable: true,
+            durable: queueConfig.QueueDurable,
             exclusive: false,
-            autoDelete: false,
+            autoDelete: queueConfig.QueueAutoDelete,
             arguments: queueArguments.Count == 0 ? null : queueArguments,
             cancellationToken: stoppingToken).ConfigureAwait(false);
+
+        await channel.QueueBindAsync(
+            queue: QueueName,
+            exchange: queueConfig.ExchangeName,
+            routingKey: queueConfig.RoutingKey,
+            cancellationToken: stoppingToken).ConfigureAwait(false);
+
+        if (queueConfig.IsRetryEnabled)
+        {
+            await channel.ExchangeDeclareAsync(
+                exchange: queueConfig.EffectiveRetryExchangeName,
+                type: ExchangeType.Direct,
+                durable: queueConfig.ExchangeDurable,
+                autoDelete: queueConfig.ExchangeAutoDelete,
+                arguments: null,
+                cancellationToken: stoppingToken).ConfigureAwait(false);
+
+            Dictionary<string, object?> retryQueueArguments = new()
+            {
+                ["x-message-ttl"] = queueConfig.RetryDelayMilliseconds > 0 ? queueConfig.RetryDelayMilliseconds : 30000,
+                ["x-dead-letter-exchange"] = queueConfig.ExchangeName,
+                ["x-dead-letter-routing-key"] = queueConfig.RoutingKey
+            };
+
+            await channel.QueueDeclareAsync(
+                queue: queueConfig.EffectiveRetryQueueName,
+                durable: queueConfig.QueueDurable,
+                exclusive: false,
+                autoDelete: queueConfig.QueueAutoDelete,
+                arguments: retryQueueArguments,
+                cancellationToken: stoppingToken).ConfigureAwait(false);
+
+            await channel.QueueBindAsync(
+                queue: queueConfig.EffectiveRetryQueueName,
+                exchange: queueConfig.EffectiveRetryExchangeName,
+                routingKey: queueConfig.EffectiveRetryRoutingKey,
+                cancellationToken: stoppingToken).ConfigureAwait(false);
+
+            await channel.ExchangeDeclareAsync(
+                exchange: queueConfig.EffectiveDeadLetterExchangeName,
+                type: ExchangeType.Direct,
+                durable: queueConfig.ExchangeDurable,
+                autoDelete: queueConfig.ExchangeAutoDelete,
+                arguments: null,
+                cancellationToken: stoppingToken).ConfigureAwait(false);
+
+            await channel.QueueDeclareAsync(
+                queue: queueConfig.EffectiveDeadLetterQueueName,
+                durable: queueConfig.QueueDurable,
+                exclusive: false,
+                autoDelete: queueConfig.QueueAutoDelete,
+                arguments: null,
+                cancellationToken: stoppingToken).ConfigureAwait(false);
+
+            await channel.QueueBindAsync(
+                queue: queueConfig.EffectiveDeadLetterQueueName,
+                exchange: queueConfig.EffectiveDeadLetterExchangeName,
+                routingKey: queueConfig.EffectiveDeadLetterRoutingKey,
+                cancellationToken: stoppingToken).ConfigureAwait(false);
+        }
  
         // PrefetchCount bounds in-flight unacked messages.
         await channel.BasicQosAsync(
@@ -368,7 +436,7 @@ internal abstract class RabbitConsumerBase<TMessage, TRow> : BackgroundService
         return Math.Max(headerCount, deadLetterCount);
     }
 
-    private static int TryGetIntValue(IReadOnlyDictionary<string, object?>? headers, string key)
+    private static int TryGetIntValue(IDictionary<string, object?>? headers, string key)
     {
         if (headers is null || !headers.TryGetValue(key, out object? value) || value is null)
         {
@@ -396,14 +464,14 @@ internal abstract class RabbitConsumerBase<TMessage, TRow> : BackgroundService
         };
     }
 
-    private static int GetDeadLetterCount(IReadOnlyDictionary<string, object?>? headers, string queueName)
+    private static int GetDeadLetterCount(IDictionary<string, object?>? headers, string queueName)
     {
         if (headers is null || !headers.TryGetValue("x-death", out object? value) || value is null)
         {
             return 0;
         }
 
-        if (value is not IList deathEntries)
+        if (value is not System.Collections.IList deathEntries)
         {
             return 0;
         }
@@ -411,7 +479,7 @@ internal abstract class RabbitConsumerBase<TMessage, TRow> : BackgroundService
         int retries = 0;
         foreach (object? entry in deathEntries)
         {
-            if (entry is not IReadOnlyDictionary<string, object?> deathDictionary)
+            if (entry is not IDictionary<string, object?> deathDictionary)
             {
                 continue;
             }
@@ -432,7 +500,7 @@ internal abstract class RabbitConsumerBase<TMessage, TRow> : BackgroundService
         return retries;
     }
 
-    private static Dictionary<string, object?> CloneHeaders(IReadOnlyDictionary<string, object?>? headers)
+    private static Dictionary<string, object?> CloneHeaders(IDictionary<string, object?>? headers)
     {
         if (headers is null)
         {

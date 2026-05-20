@@ -27,7 +27,7 @@ internal sealed class HttpCallLogConsumer : RabbitConsumerBase<HttpClientCallLog
         _options = consumerOptions.Value;
     }
 
-    protected override string QueueName => _queueConfig.QueueName;
+    protected override RabbitMqQueueConfigModel QueueConfig => _queueConfig;
     protected override string ConsumerName => "HttpCallLog";
 
     protected override HttpTrafficLogItem Map(HttpClientCallLogModel message)
